@@ -2,21 +2,32 @@ import { useState, useEffect, useCallback, useMemo, ChangeEvent } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { NoteNode } from './components/NoteNode';
 import { ConnectionLine } from './components/ConnectionLine';
+import { ChangelogView } from './components/ChangelogView';
+import { NoteListView } from './components/NoteListView';
+import { FocusEditor } from './components/FocusEditor';
 import { useCanvas } from './hooks/useCanvas';
 import { dbService } from './lib/db';
 import { Project, Note, Connection, AppData } from './types';
-import { Plus, Maximize, MousePointer2, Zap, Download } from 'lucide-react';
+import { Plus, Maximize, MousePointer2, Zap, Download, Layers } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import JSZip from 'jszip';
 
+type ConnectionPoint = 'top' | 'bottom' | 'left' | 'right';
+
+export type ViewMode = 'canvas' | 'list' | 'changelog' | 'focus';
+
 export default function App() {
+  const [viewMode, setViewMode] = useState<ViewMode>('canvas');
+  const [selectedNoteId, setSelectedNoteId] = useState<string | null>(null);
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProjectId, setActiveProjectId] = useState<string | null>(null);
   const [notes, setNotes] = useState<Note[]>([]);
   const [connections, setConnections] = useState<Connection[]>([]);
-  const [connectingSourceId, setConnectingSourceId] = useState<string | null>(null);
+  const [connectingSource, setConnectingSource] = useState<{ id: string, point: ConnectionPoint } | null>(null);
   
   const { scale, setScale, offset, setOffset, startPan, canvasRef, onWheel, resetView } = useCanvas();
+
+  const selectedNote = useMemo(() => notes.find(n => n.id === selectedNoteId), [notes, selectedNoteId]);
 
   // Load projects on mount
   useEffect(() => {
@@ -36,17 +47,22 @@ export default function App() {
   }, [activeProjectId]);
 
   const handleCreateProject = useCallback(async () => {
-    const name = prompt('Enter project name:');
-    if (!name) return;
-    const newProject: Project = {
-      id: crypto.randomUUID(),
-      name,
-      createdAt: Date.now(),
-      updatedAt: Date.now()
-    };
-    await dbService.saveProject(newProject);
-    setProjects(prev => [...prev, newProject]);
-    setActiveProjectId(newProject.id);
+    const name = window.prompt('Enter project name:');
+    if (!name || name.trim() === '') return;
+    try {
+      const newProject: Project = {
+        id: crypto.randomUUID(),
+        name: name.trim(),
+        createdAt: Date.now(),
+        updatedAt: Date.now()
+      };
+      await dbService.saveProject(newProject);
+      setProjects(prev => [...prev, newProject]);
+      setActiveProjectId(newProject.id);
+      setViewMode('canvas');
+    } catch (err) {
+      console.error("Failed to create project", err);
+    }
   }, []);
 
   const handleDeleteProject = useCallback(async (id: string) => {
@@ -71,13 +87,16 @@ export default function App() {
     setNotes(prev => [...prev, newNote]);
   }, [activeProjectId, offset, scale]);
 
-  const handleUpdateNote = useCallback(async (id: string, updates: Partial<Note>) => {
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, ...updates, updatedAt: Date.now() } : n));
-    const note = notes.find(n => n.id === id);
-    if (note) {
-      await dbService.saveNote({ ...note, ...updates, updatedAt: Date.now() });
-    }
-  }, [notes]);
+  const handleUpdateNote = useCallback(async (id: string, updates: Partial<Note>, persist: boolean = true) => {
+    setNotes(prev => {
+      const updatedNotes = prev.map(n => n.id === id ? { ...n, ...updates, updatedAt: Date.now() } : n);
+      if (persist) {
+        const note = updatedNotes.find(n => n.id === id);
+        if (note) dbService.saveNote(note);
+      }
+      return updatedNotes;
+    });
+  }, []);
 
   const handleDeleteNote = useCallback(async (id: string) => {
     await dbService.deleteNote(id);
@@ -85,38 +104,40 @@ export default function App() {
     setConnections(prev => prev.filter(c => c.fromNoteId !== id && c.toNoteId !== id));
   }, []);
 
-  const handleConnectStart = useCallback((id: string) => {
-    setConnectingSourceId(id);
+  const handleConnectStart = useCallback((id: string, point: ConnectionPoint) => {
+    setConnectingSource({ id, point });
   }, []);
 
-  const handleConnectEnd = useCallback(async (id: string) => {
-    if (!connectingSourceId || connectingSourceId === id) {
-      setConnectingSourceId(null);
+  const handleConnectEnd = useCallback(async (id: string, point: ConnectionPoint) => {
+    if (!connectingSource || connectingSource.id === id) {
+      setConnectingSource(null);
       return;
     }
 
     const pid = activeProjectId || 'general';
     const existing = connections.find(c => 
-      (c.fromNoteId === connectingSourceId && c.toNoteId === id) ||
-      (c.fromNoteId === id && c.toNoteId === connectingSourceId)
+      (c.fromNoteId === connectingSource.id && c.toNoteId === id) ||
+      (c.fromNoteId === id && c.toNoteId === connectingSource.id)
     );
 
     if (existing) {
-      setConnectingSourceId(null);
+      setConnectingSource(null);
       return;
     }
 
     const newConn: Connection = {
       id: crypto.randomUUID(),
       projectId: pid,
-      fromNoteId: connectingSourceId,
-      toNoteId: id
+      fromNoteId: connectingSource.id,
+      toNoteId: id,
+      fromPoint: connectingSource.point,
+      toPoint: point
     };
 
     await dbService.saveConnection(newConn);
     setConnections(prev => [...prev, newConn]);
-    setConnectingSourceId(null);
-  }, [connectingSourceId, connections, activeProjectId]);
+    setConnectingSource(null);
+  }, [connectingSource, connections, activeProjectId]);
 
   const handleExport = useCallback(async () => {
     const data = await dbService.getFullExport();
@@ -169,130 +190,169 @@ export default function App() {
     URL.revokeObjectURL(url);
   }, []);
 
+  const activeProjectName = useMemo(() => 
+    projects.find(p => p.id === activeProjectId)?.name || 'General Space'
+  , [projects, activeProjectId]);
+
   return (
     <div className="flex h-screen w-full bg-[#FCFCFB] overflow-hidden select-none">
       <Sidebar 
         projects={projects}
         activeProjectId={activeProjectId}
-        onSelectProject={setActiveProjectId}
+        onSelectProject={(id) => {
+          setActiveProjectId(id);
+          setViewMode('canvas');
+        }}
         onCreateProject={handleCreateProject}
         onDeleteProject={handleDeleteProject}
         onExport={handleExport}
         onImport={handleImport}
+        viewMode={viewMode}
+        setViewMode={setViewMode}
       />
 
-      <main 
-        ref={canvasRef}
-        className="flex-1 relative overflow-hidden canvas-bg"
-        onMouseDown={startPan}
-        onWheel={onWheel}
-      >
-        {/* Canvas Content Container */}
-        <div 
-          className="absolute inset-0 transition-none"
-          style={{ 
-            transformOrigin: '0 0',
-            transform: `translate(${offset.x}px, ${offset.y}px)` 
-          }}
+      {viewMode === 'canvas' && (
+        <main 
+          ref={canvasRef}
+          className="flex-1 relative overflow-hidden canvas-bg"
+          onMouseDown={startPan}
+          onWheel={onWheel}
         >
-          {/* Connections Layer */}
-          {connections.map(conn => {
-            const fromNote = notes.find(n => n.id === conn.fromNoteId);
-            const toNote = notes.find(n => n.id === conn.toNoteId);
-            if (!fromNote || !toNote) return null;
-            return <ConnectionLine key={conn.id} from={fromNote} to={toNote} scale={scale} />;
-          })}
+          {/* Canvas Content Container */}
+          <div 
+            className="absolute inset-0 transition-none"
+            style={{ 
+              transformOrigin: '0 0',
+              transform: `translate(${offset.x}px, ${offset.y}px)` 
+            }}
+          >
+            {/* Connections Layer */}
+            {connections.map(conn => {
+              const fromNote = notes.find(n => n.id === conn.fromNoteId);
+              const toNote = notes.find(n => n.id === conn.toNoteId);
+              if (!fromNote || !toNote) return null;
+              return (
+                <ConnectionLine 
+                  key={conn.id} 
+                  from={fromNote} 
+                  to={toNote} 
+                  scale={scale} 
+                  fromPoint={conn.fromPoint} 
+                  toPoint={conn.toPoint} 
+                />
+              );
+            })}
 
-          {/* Notes Layer */}
-          <AnimatePresence>
-            {notes.map(note => (
-              <NoteNode 
-                key={note.id}
-                note={note}
-                scale={scale}
-                onUpdate={handleUpdateNote}
-                onDelete={handleDeleteNote}
-                onConnectStart={handleConnectStart}
-                onConnectEnd={handleConnectEnd}
-                isConnectingSource={connectingSourceId === note.id}
-              />
-            ))}
-          </AnimatePresence>
-        </div>
+            {/* Notes Layer */}
+            <AnimatePresence>
+              {notes.map(note => (
+                <NoteNode 
+                  key={note.id}
+                  note={note}
+                  scale={scale}
+                  onUpdate={handleUpdateNote}
+                  onDelete={handleDeleteNote}
+                  onConnectStart={handleConnectStart}
+                  onConnectEnd={handleConnectEnd}
+                  isConnecting={connectingSource?.id === note.id}
+                />
+              ))}
+            </AnimatePresence>
+          </div>
 
-        {/* HUD UI */}
-        <div className="absolute top-6 left-6 right-6 flex items-center justify-between pointer-events-none">
-          <div className="flex items-center gap-4">
-             <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-sm border border-zinc-200 flex items-center gap-3 pointer-events-auto">
-                <span className="text-xs font-semibold text-zinc-900">
-                  {projects.find(p => p.id === activeProjectId)?.name || 'General Space'}
-                </span>
-                <div className="w-px h-3 bg-zinc-200" />
-                <span className="text-[10px] text-zinc-400 font-mono">
-                  {notes.length} NOTES
-                </span>
-             </div>
-             
-             {connectingSourceId && (
-               <motion.div 
-                 initial={{ opacity: 0, y: -10 }}
-                 animate={{ opacity: 1, y: 0 }}
-                 className="bg-blue-500 px-4 py-2 rounded-2xl shadow-lg border border-blue-600 flex items-center gap-2 pointer-events-auto"
-               >
-                 <Zap className="w-3.5 h-3.5 text-white animate-pulse" />
-                 <span className="text-xs font-medium text-white italic">Select another note to connect...</span>
-                 <button 
-                  onClick={() => setConnectingSourceId(null)}
-                  className="ml-2 text-[10px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-white transition-colors"
+          {/* HUD UI */}
+          <div className="absolute top-6 left-6 right-6 flex items-center justify-between pointer-events-none">
+            <div className="flex items-center gap-4">
+               <div className="bg-white/80 backdrop-blur-md px-4 py-2 rounded-2xl shadow-sm border border-zinc-200 flex items-center gap-3 pointer-events-auto">
+                  <span className="text-xs font-semibold text-zinc-900">{activeProjectName}</span>
+                  <div className="w-px h-3 bg-zinc-200" />
+                  <span className="text-[10px] text-zinc-400 font-mono">
+                    {notes.length} NOTES
+                  </span>
+               </div>
+               
+               {connectingSource && (
+                 <motion.div 
+                   initial={{ opacity: 0, y: -10 }}
+                   animate={{ opacity: 1, y: 0 }}
+                   className="bg-zinc-900 px-4 py-2 rounded-2xl shadow-lg border border-black flex items-center gap-2 pointer-events-auto"
                  >
-                   Cancel
-                 </button>
-               </motion.div>
-             )}
+                   <Zap className="w-3.5 h-3.5 text-white animate-pulse" />
+                   <span className="text-xs font-medium text-white italic">Drop on a node handle to connect...</span>
+                   <button 
+                    onClick={() => setConnectingSource(null)}
+                    className="ml-2 text-[10px] bg-white/20 hover:bg-white/30 px-2 py-0.5 rounded text-white transition-colors"
+                   >
+                     Cancel
+                   </button>
+                 </motion.div>
+               )}
+            </div>
+
+            <div className="flex items-center gap-2 pointer-events-auto">
+              <button
+                onClick={handleCreateNote}
+                className="flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-2xl shadow-xl hover:bg-black transition-all active:scale-95 group"
+              >
+                <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
+                <span className="text-sm font-medium">New Thought</span>
+              </button>
+              
+              <button
+                 onClick={resetView}
+                 title="Reset View"
+                 className="p-2.5 bg-white border border-zinc-200 text-zinc-500 hover:text-zinc-900 rounded-2xl shadow-sm transition-all"
+              >
+                 <Layers className="w-4 h-4" />
+              </button>
+              <button
+                 onClick={handleExportZip}
+                 title="Export ZIP Archive"
+                 className="p-2.5 bg-white border border-zinc-200 text-zinc-500 hover:text-zinc-900 rounded-2xl shadow-sm transition-all"
+              >
+                 <Download className="w-4 h-4" />
+              </button>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 pointer-events-auto">
-            <button
-              onClick={handleCreateNote}
-              className="flex items-center gap-2 bg-zinc-900 text-white px-5 py-2.5 rounded-2xl shadow-xl hover:bg-black transition-all active:scale-95 group"
-            >
-              <Plus className="w-4 h-4 group-hover:rotate-90 transition-transform" />
-              <span className="text-sm font-medium">New Thought</span>
-            </button>
-            
-            <button
-               onClick={resetView}
-               title="Reset View"
-               className="p-2.5 bg-white border border-zinc-200 text-zinc-500 hover:text-zinc-900 rounded-2xl shadow-sm transition-all"
-            >
-               <Maximize className="w-4 h-4" />
-            </button>
-            <button
-               onClick={handleExportZip}
-               title="Export ZIP Archive"
-               className="p-2.5 bg-white border border-zinc-200 text-zinc-500 hover:text-zinc-900 rounded-2xl shadow-sm transition-all"
-            >
-               <Download className="w-4 h-4" />
-            </button>
+          <div className="absolute bottom-6 left-6 flex items-center gap-2 pointer-events-auto">
+            <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-zinc-200 flex items-center gap-3">
+               <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400">
+                  <MousePointer2 className="w-3 h-3" />
+                  MIDDLE CLICK OR ALT+CLICK TO PAN
+               </div>
+               <div className="w-px h-2 bg-zinc-200" />
+               <div className="flex items-center gap-2">
+                  <button onClick={() => setScale(s => Math.max(s - 0.1, 0.1))} className="text-xs font-mono px-1 hover:text-zinc-900">-</button>
+                  <span className="text-[10px] font-mono min-w-[3ch] text-center">{Math.round(scale * 100)}%</span>
+                  <button onClick={() => setScale(s => Math.min(s + 0.1, 5))} className="text-xs font-mono px-1 hover:text-zinc-900">+</button>
+               </div>
+            </div>
           </div>
-        </div>
+        </main>
+      )}
 
-        {/* Footer controls */}
-        <div className="absolute bottom-6 left-6 flex items-center gap-2 pointer-events-auto">
-          <div className="bg-white/80 backdrop-blur-md px-3 py-1.5 rounded-full shadow-sm border border-zinc-200 flex items-center gap-3">
-             <div className="flex items-center gap-1.5 text-[10px] font-bold text-zinc-400">
-                <MousePointer2 className="w-3 h-3" />
-                MIDDLE CLICK OR ALT+CLICK TO PAN
-             </div>
-             <div className="w-px h-2 bg-zinc-200" />
-             <div className="flex items-center gap-2">
-                <button onClick={() => setScale(s => Math.max(s - 0.1, 0.1))} className="text-xs font-mono px-1 hover:text-zinc-900">-</button>
-                <span className="text-[10px] font-mono min-w-[3ch] text-center">{Math.round(scale * 100)}%</span>
-                <button onClick={() => setScale(s => Math.min(s + 0.1, 5))} className="text-xs font-mono px-1 hover:text-zinc-900">+</button>
-             </div>
-          </div>
-        </div>
-      </main>
+      {viewMode === 'list' && (
+        <NoteListView 
+          notes={notes} 
+          projectName={activeProjectName}
+          onNoteSelect={(id) => {
+            setSelectedNoteId(id);
+            setViewMode('focus');
+          }} 
+        />
+      )}
+
+      {viewMode === 'changelog' && <ChangelogView />}
+
+      {viewMode === 'focus' && selectedNote && (
+        <FocusEditor 
+          note={selectedNote} 
+          onUpdate={handleUpdateNote} 
+          onDelete={handleDeleteNote}
+          onClose={() => setViewMode('canvas')} 
+        />
+      )}
     </div>
   );
 }

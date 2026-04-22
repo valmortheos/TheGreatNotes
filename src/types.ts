@@ -11,6 +11,9 @@ export interface Note {
   content: string;
   x: number;
   y: number;
+  width?: number;
+  height?: number;
+  isExpanded?: boolean;
   color?: string;
   createdAt: number;
   updatedAt: number;
@@ -21,6 +24,8 @@ export interface Connection {
   projectId: string;
   fromNoteId: string;
   toNoteId: string;
+  fromPoint?: 'top' | 'bottom' | 'left' | 'right';
+  toPoint?: 'top' | 'bottom' | 'left' | 'right';
 }
 
 export interface AppData {

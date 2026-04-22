@@ -10,19 +10,21 @@
   body {
     @apply bg-[#FCFCFB] text-zinc-900 font-sans;
     overflow: hidden;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
   }
 
-  ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+  body::-webkit-scrollbar {
+    display: none; /* Safari and Chrome */
   }
 
-  ::-webkit-scrollbar-track {
-    @apply bg-transparent;
+  /* Universal scrollbar hiding while allowing scroll */
+  .no-scrollbar {
+    scrollbar-width: none;
+    -ms-overflow-style: none;
   }
-
-  ::-webkit-scrollbar-thumb {
-    @apply bg-zinc-200 rounded-full hover:bg-zinc-300 transition-colors;
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
   }
 }
 

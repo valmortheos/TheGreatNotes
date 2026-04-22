@@ -1,7 +1,8 @@
 import { ChangeEvent } from 'react';
-import { Plus, Folder, Trash2, Home, Download, Upload } from 'lucide-react';
+import { Plus, Folder, Trash2, Home, Download, Upload, List, Network, Info } from 'lucide-react';
 import { Project } from '../types';
 import { cn } from '../lib/utils';
+import { ViewMode } from '../App';
 
 interface SidebarProps {
   projects: Project[];
@@ -11,6 +12,8 @@ interface SidebarProps {
   onDeleteProject: (id: string) => void;
   onExport: () => void;
   onImport: (e: ChangeEvent<HTMLInputElement>) => void;
+  viewMode: ViewMode;
+  setViewMode: (v: ViewMode) => void;
 }
 
 export function Sidebar({ 
@@ -20,7 +23,9 @@ export function Sidebar({
   onCreateProject, 
   onDeleteProject,
   onExport,
-  onImport
+  onImport,
+  viewMode,
+  setViewMode
 }: SidebarProps) {
   return (
     <div className="w-64 h-full bg-[#F5F5F3] border-r border-zinc-200 flex flex-col z-20">
@@ -32,53 +37,91 @@ export function Sidebar({
           <h1 className="text-sm font-semibold tracking-tight text-zinc-800">The Great Notes</h1>
         </div>
 
-        <button
-          onClick={() => onSelectProject(null)}
-          className={cn(
-            "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-2",
-            activeProjectId === null ? "bg-[#EBEBE8] text-zinc-900" : "text-zinc-500 hover:bg-[#EBEBE8] hover:text-zinc-900"
-          )}
-        >
-          <Home className="w-4 h-4" />
-          General
-        </button>
+        <div className="space-y-4">
+           {/* Navigation Tabs */}
+           <div className="space-y-1">
+             <button
+                onClick={() => setViewMode('canvas')}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  viewMode === 'canvas' ? "bg-[#EBEBE8] text-zinc-900" : "text-zinc-500 hover:bg-[#EBEBE8] hover:text-zinc-900"
+                )}
+             >
+                <Network className="w-4 h-4" />
+                Neural Map
+             </button>
+             <button
+                onClick={() => setViewMode('list')}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  viewMode === 'list' ? "bg-[#EBEBE8] text-zinc-900" : "text-zinc-500 hover:bg-[#EBEBE8] hover:text-zinc-900"
+                )}
+             >
+                <List className="w-4 h-4" />
+                List View
+             </button>
+             <button
+                onClick={() => setViewMode('changelog')}
+                className={cn(
+                  "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                  viewMode === 'changelog' ? "bg-[#EBEBE8] text-zinc-900" : "text-zinc-500 hover:bg-[#EBEBE8] hover:text-zinc-900"
+                )}
+             >
+                <Info className="w-4 h-4" />
+                What's New
+             </button>
+           </div>
 
-        <div className="mt-8 mb-4">
-          <div className="flex items-center justify-between px-3 mb-2">
-            <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Projects</span>
-            <button 
-              onClick={onCreateProject}
-              className="p-1 hover:bg-[#EBEBE8] rounded text-zinc-400 hover:text-zinc-900 transition-colors"
-            >
-              <Plus className="w-3.5 h-3.5" />
-            </button>
-          </div>
-          
-          <div className="space-y-1">
-            {projects.map(project => (
-              <div key={project.id} className="group relative">
-                <button
-                  onClick={() => onSelectProject(project.id)}
-                  className={cn(
-                    "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left pr-10",
-                    activeProjectId === project.id ? "bg-[#EBEBE8] text-zinc-900" : "text-zinc-500 hover:bg-[#EBEBE8] hover:text-zinc-900"
-                  )}
-                >
-                  <Folder className="w-4 h-4" />
-                  <span className="truncate">{project.name}</span>
-                </button>
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onDeleteProject(project.id);
-                  }}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-all rounded"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            ))}
-          </div>
+           <div className="h-px bg-zinc-200 my-4" />
+
+           <button
+             onClick={() => onSelectProject(null)}
+             className={cn(
+               "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-2",
+               activeProjectId === null ? "bg-[#EBEBE8] text-zinc-900" : "text-zinc-500 hover:bg-[#EBEBE8] hover:text-zinc-900"
+             )}
+           >
+             <Home className="w-4 h-4" />
+             General Space
+           </button>
+
+           <div className="mt-8 mb-4">
+             <div className="flex items-center justify-between px-3 mb-2">
+               <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-widest">Projects</span>
+               <button 
+                 onClick={onCreateProject}
+                 className="p-1 hover:bg-[#EBEBE8] rounded text-zinc-400 hover:text-zinc-900 transition-colors"
+               >
+                 <Plus className="w-3.5 h-3.5" />
+               </button>
+             </div>
+             
+             <div className="space-y-1">
+               {projects.map(project => (
+                 <div key={project.id} className="group relative">
+                   <button
+                     onClick={() => onSelectProject(project.id)}
+                     className={cn(
+                       "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors text-left pr-10",
+                       activeProjectId === project.id ? "bg-[#EBEBE8] text-zinc-900" : "text-zinc-500 hover:bg-[#EBEBE8] hover:text-zinc-900"
+                     )}
+                   >
+                     <Folder className="w-4 h-4" />
+                     <span className="truncate">{project.name}</span>
+                   </button>
+                   <button
+                     onClick={(e) => {
+                       e.stopPropagation();
+                       onDeleteProject(project.id);
+                     }}
+                     className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 opacity-0 group-hover:opacity-100 text-zinc-400 hover:text-red-500 transition-all rounded"
+                   >
+                     <Trash2 className="w-3.5 h-3.5" />
+                   </button>
+                 </div>
+               ))}
+             </div>
+           </div>
         </div>
       </div>
 

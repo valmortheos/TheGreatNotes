@@ -1,20 +1,61 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# The Great Notes 🧠
 
-# Run and deploy your AI Studio app
+A neural-style brainstorming and note-taking application designed for visual connections and non-linear thinking. 
 
-This contains everything you need to run your app locally.
+Built with **React**, **TypeScript**, **Framer Motion**, and **IndexedDB**.
 
-View your app in AI Studio: https://ai.studio/apps/d5f38a45-83ec-4d83-97b4-f520fee5488a
+## ✨ Key Features
 
-## Run Locally
+- **Neural Canvas**: A zoomable, pannable infinite space for your thoughts.
+- **Node Connectivity**: Connect notes with organic lines to visualize relationships.
+- **Markdown Support**: Take notes in Markdown and view them as styled content.
+- **Expandable Views**: Keep notes small for overview, or expand them for deep writing.
+- **Multi-Project Support**: Organize thoughts into separate workspaces or "folders".
+- **Local-First**: Everything is stored in your browser using IndexedDB. No server required.
+- **Privacy First**: Your data never leaves your machine.
+- **Export/Import**: Save backups in JSON or full archives in ZIP.
 
-**Prerequisites:**  Node.js
+## 🚀 Getting Started
 
+### Prerequisites
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- Node.js (v18 or higher)
+- npm or yarn
+
+### Installation
+
+1. Clone the repository:
+   ```bash
+   git clone https://github.com/your-username/the-great-notes.git
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Start the development server:
+   ```bash
+   npm run dev
+   ```
+
+## 🛠️ Usage
+
+- **Panning**: Hold `Alt` and drag with your mouse, or use the middle mouse button.
+- **Zooming**: `Ctrl + Scroll` or use the pinch gesture.
+- **Connecting**: Hover over a note, click one of the floating "dots" (handles), and drag to another note's handle to create a link.
+- **Expansion**: Toggle the "Full View" icon on a note to expand its content.
+
+## 📦 Deployment
+
+This app is ready for static hosting (GitHub Pages, Vercel, Netlify).
+
+To build for production:
+```bash
+npm run build
+```
+
+## 📄 License
+
+This project is licensed under the Apache-2.0 License.
+
+---
+Made with ❤️ for modern thinkers.

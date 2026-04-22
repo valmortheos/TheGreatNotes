@@ -1,0 +1,25 @@
+[
+  {
+    "version": "1.1.0",
+    "date": "2026-04-22",
+    "changes": [
+      "Optimized node connectivity with handle-based interactions (Dots!).",
+      "Integrated Markdown support with real-time preview (remark-gfm).",
+      "Added manual resizing and toggle-able expanded views for notes.",
+      "Global scrollbars hidden for a cleaner immersive experience.",
+      "Implemented GitHub Hosting workflow and full documentation.",
+      "Fixed connection logic for smoother visual linking."
+    ]
+  },
+  {
+    "version": "1.0.0",
+    "date": "2026-04-22",
+    "changes": [
+      "Initial launch of The Great Notes.",
+      "Neural drafting canvas with zoom/pan capabilities.",
+      "Project management and folder isolation.",
+      "IndexedDB persistence for all data.",
+      "JSON and ZIP export/import features."
+    ]
+  }
+]
